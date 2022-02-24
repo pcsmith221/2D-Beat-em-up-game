@@ -38,16 +38,18 @@ public class Player : MonoBehaviour
     Health health;
     //Collider2D enemyGrabbedCollider;
     PauseScreen pauseScreen;
+    DialogueManager dialogueManager;
 
     //state variables
     Vector2 movement; 
     float yOnGroundPosition;
     float nextAttackTime = 0f;
-    //bool isAlive = true;
+
     bool isGrabbing = false;
     bool isJumping = false;
     bool isAirAttacking = false;
     bool isKnockedback = false;
+    bool isInDialogue = false;
     EnemyHealth enemyGrabbed;
 
     //"bool" variables because animation events cant pass bool parameters
@@ -63,6 +65,7 @@ public class Player : MonoBehaviour
         myCapsuleCollider2D = GetComponent<CapsuleCollider2D>();
         health = GetComponent<Health>();
         pauseScreen = FindObjectOfType<PauseScreen>();
+        dialogueManager = FindObjectOfType<DialogueManager>();
     }
 
 
@@ -70,12 +73,16 @@ public class Player : MonoBehaviour
     void Update()
     {
         // Ground attacks don't deal with physics so they can go into Update()
-        if (!isKnockedback && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        if (!isKnockedback && !isInDialogue && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
         {
             GroundAttack();
             Grab();
             GrabAttack();
             BackAttack();
+        }
+        else if (isInDialogue)
+        {
+            Dialogue();
         }
     }
 
@@ -84,7 +91,7 @@ public class Player : MonoBehaviour
     private void FixedUpdate()
     // The methods that deal with physics should go into FixedUpdate(). 
     {
-        if (!isKnockedback && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        if (!isKnockedback && !isInDialogue && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
         {
             Move();
             FlipSprite();
@@ -95,6 +102,16 @@ public class Player : MonoBehaviour
         else if (isKnockedback)
         {
             OnLanding();
+        }
+    }
+
+
+
+    private void Dialogue()
+    {
+        if (Input.GetButtonDown("Fire1"))
+        {
+            dialogueManager.DisplayNextSentence();
         }
     }
 
@@ -429,6 +446,13 @@ public class Player : MonoBehaviour
         {
             transform.localScale = new Vector2(Mathf.Sign(myRigidBody.velocity.x), 1f); 
         }
+    }
+
+
+
+    public void SetIsInDialogue(bool isInDialogue)
+    {
+        this.isInDialogue = isInDialogue;
     }
 
 

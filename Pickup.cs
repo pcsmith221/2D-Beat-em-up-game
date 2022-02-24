@@ -11,7 +11,7 @@ public class Pickup : MonoBehaviour
     Score playerScore;
 
     //state variables
-    public bool pickupAllowed = false;
+    bool pickupAllowed = false;
 
     void Start()
     {

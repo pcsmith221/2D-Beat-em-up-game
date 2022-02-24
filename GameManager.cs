@@ -2,11 +2,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Keeps track of total player lives and ends the game if it drops below zero.
+
 public class GameManager : MonoBehaviour
 {
     [SerializeField] GameObject loseScreen;
 
-    int playersWithLives = 0;
     int playerLives = 0;
 
     private void Start()
@@ -23,15 +24,6 @@ public class GameManager : MonoBehaviour
     }
 
 
-    private void Update()
-    {
-        if (playerLives < 0)
-        {
-            GameOver();
-        }
-    }
-
-
 
     public void IncrementPlayerLives()
     {
@@ -43,6 +35,11 @@ public class GameManager : MonoBehaviour
     public void DecrementPlayerLives()
     {
         playerLives--;
+
+        if (playerLives < 0)
+        {
+            GameOver();
+        }
     }
 
 

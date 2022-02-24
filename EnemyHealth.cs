@@ -6,6 +6,10 @@ using UnityEngine;
 // Class that manages Enemy health and grabbed states. 
 public class EnemyHealth : MonoBehaviour
 {
+    [SerializeField] string hitSound;
+    [SerializeField] string deathSound;
+    [SerializeField] string hitGroundSound;
+
     [Header("Health Parameters")]
 
     [SerializeField] int maxHealth = 100;
@@ -40,11 +44,12 @@ public class EnemyHealth : MonoBehaviour
     float timeCanMoveAgain = 0f;
     Player playerMostRecentlyAttackedBy; // for correct individual scoring
 
-    // Cached component references
+    // Cached references
     Animator animator;
     Rigidbody2D rb;
     Collider2D myCollider2D;
     BattleEvent battleEvent;
+    AudioManager audioManager;
 
     private void Start()
     {
@@ -52,6 +57,8 @@ public class EnemyHealth : MonoBehaviour
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
         myCollider2D = GetComponent<Collider2D>();
+
+        audioManager = FindObjectOfType<AudioManager>();
 
         // The only enemies that have a parent transform are those spawned within a battle event. This allows me to leave enemies outside battle events. 
         if(transform.parent)
@@ -136,6 +143,8 @@ public class EnemyHealth : MonoBehaviour
             timeCanMoveAgain = Time.time + recoveryTime;
 
             animator.SetBool("isThrown", false);
+            audioManager.Play(hitGroundSound);
+
             isBeingKnockedback = false;
             isBeingThrown = false;
 
@@ -204,6 +213,7 @@ public class EnemyHealth : MonoBehaviour
         if (staggerOnHit)
         {
             animator.SetTrigger("hit");
+            audioManager.Play(hitSound);
         }
 
         if (currentHealth <= Mathf.Epsilon)
@@ -229,21 +239,19 @@ public class EnemyHealth : MonoBehaviour
     private void Die()
     // Triggers death animation and disables the enemy. 
     {
-        //Debug.Log(name + " died");
         if(transform.parent)
         {
             battleEvent.DecrementEnemy();
         }
         
         animator.SetBool("isDead", true);
+        audioManager.Play(deathSound);
 
         if (isGrabbed)
         {
             animator.SetBool("isGrabbed", false);
         }
 
-        // Increase score of player who defeated enemy
-        //var playerKilledBy = GetComponent<Enemy>().GetCurrentTarget();
         playerMostRecentlyAttackedBy.GetComponent<Score>().AddToScore(scoreForDefeating);
 
         //disable the enemy
@@ -262,6 +270,7 @@ public class EnemyHealth : MonoBehaviour
 
 
     public void SetPlayerMostRecentlyAttackedBy(Player player)
+        // Used to give the correct player the score when the enemy is defeated.
     {
         playerMostRecentlyAttackedBy = player;
     }

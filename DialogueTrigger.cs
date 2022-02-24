@@ -4,15 +4,44 @@ using UnityEngine;
 
 public class DialogueTrigger : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    [SerializeField] Dialogue dialogue;
 
-    // Update is called once per frame
+    // State variable
+    bool inDialogueRange;
+
+
+
     void Update()
     {
-        
+        if (inDialogueRange && Input.GetButtonDown("Pickup"))
+        {
+            TriggerDialogue();
+        }
+    }
+
+
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            inDialogueRange = true;
+        }
+
+    }
+
+
+
+    private void OnTriggerExit2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            inDialogueRange = false;
+        }
+    }
+
+    public void TriggerDialogue()
+    {
+        FindObjectOfType<DialogueManager>().StartDialogue(dialogue);
     }
 }
