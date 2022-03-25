@@ -58,6 +58,12 @@ public class BattleEvent : MonoBehaviour
         {
             SetBattleColliders(true);
 
+            var players = FindObjectsOfType<Player>();
+            foreach (Player player in players)
+            {
+                player.SetIsInCombat(true);
+            }
+
             // prevent camera from moving by disabling it 
             virtualCamera.enabled = false;
 
@@ -69,7 +75,7 @@ public class BattleEvent : MonoBehaviour
 
 
     private void EnableSpawners()
-        // emables spawners and adds their enemy count to the total 
+        // Enables spawners and adds their enemy count to the total 
     {
         foreach (GoonSpawner spawner in goonSpawners)
         {
@@ -82,13 +88,20 @@ public class BattleEvent : MonoBehaviour
 
 
     private void CheckIfAllEnemiesDefeated()
-        // reset camera and level boundaries once all enemies defeated
+        // Reset camera and level boundaries once all enemies defeated
     {
         if (totalNumberOfEnemiesToDefeat <= 0)
         {
 
             virtualCamera.enabled = true;
             SetBattleColliders(false);
+
+            var players = FindObjectsOfType<Player>();
+            foreach (Player player in players)
+            {
+                player.SetIsInCombat(false);
+            }
+
             // TODO display go graphic
         }
     }
@@ -96,7 +109,7 @@ public class BattleEvent : MonoBehaviour
 
 
     public void DecrementEnemy()
-        // reduce total when an enemy is defeated
+        // Reduce total when an enemy is defeated
     {
         totalNumberOfEnemiesToDefeat--;
     }

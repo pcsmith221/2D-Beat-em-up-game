@@ -29,7 +29,10 @@ public class Player : MonoBehaviour
     [SerializeField] float attackRange = 0.5f;
     [SerializeField] int attackDamage = 20;
     [Tooltip("# Attacks per second")]
-    [SerializeField] float attackRate = 10f; //number of attacks per second
+    [SerializeField] float attackRate = 10f;
+
+    [Header("Sound clip names")]
+    [SerializeField] string playerHitSound;
 
     //cached component references
     Rigidbody2D myRigidBody;
@@ -39,6 +42,7 @@ public class Player : MonoBehaviour
     //Collider2D enemyGrabbedCollider;
     PauseScreen pauseScreen;
     DialogueManager dialogueManager;
+    AudioManager audioManager;
 
     //state variables
     Vector2 movement; 
@@ -49,7 +53,8 @@ public class Player : MonoBehaviour
     bool isJumping = false;
     bool isAirAttacking = false;
     bool isKnockedback = false;
-    bool isInDialogue = false;
+    bool isDisabled = false;
+    bool isInCombat = false;
     EnemyHealth enemyGrabbed;
 
     //"bool" variables because animation events cant pass bool parameters
@@ -64,6 +69,8 @@ public class Player : MonoBehaviour
         animator = GetComponent<Animator>();
         myCapsuleCollider2D = GetComponent<CapsuleCollider2D>();
         health = GetComponent<Health>();
+
+        audioManager = FindObjectOfType<AudioManager>();
         pauseScreen = FindObjectOfType<PauseScreen>();
         dialogueManager = FindObjectOfType<DialogueManager>();
     }
@@ -73,14 +80,14 @@ public class Player : MonoBehaviour
     void Update()
     {
         // Ground attacks don't deal with physics so they can go into Update()
-        if (!isKnockedback && !isInDialogue && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        if (!isKnockedback && !isDisabled && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
         {
             GroundAttack();
             Grab();
             GrabAttack();
             BackAttack();
         }
-        else if (isInDialogue)
+        else if (isDisabled)
         {
             Dialogue();
         }
@@ -91,7 +98,7 @@ public class Player : MonoBehaviour
     private void FixedUpdate()
     // The methods that deal with physics should go into FixedUpdate(). 
     {
-        if (!isKnockedback && !isInDialogue && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        if (!isKnockedback && !isDisabled && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
         {
             Move();
             FlipSprite();
@@ -99,7 +106,7 @@ public class Player : MonoBehaviour
             Jump();
             AirAttack();
         }
-        else if (isKnockedback)
+        else if (isKnockedback || isJumping)
         {
             OnLanding();
         }
@@ -109,6 +116,11 @@ public class Player : MonoBehaviour
 
     private void Dialogue()
     {
+        //if (!isJumping)
+        //{
+        //    myRigidBody.velocity = new Vector2(0, 0);
+        //}
+
         if (Input.GetButtonDown("Fire1"))
         {
             dialogueManager.DisplayNextSentence();
@@ -122,8 +134,9 @@ public class Player : MonoBehaviour
     // Damage is dealt to the player in enemy script, EnemyDealDamage() method
     {
 
-        // TODO add sound or particle effects
+        // could add some particle effects
         animator.SetTrigger("playerHit");
+        audioManager.Play(playerHitSound);
 
         // Let any grabbed enemies go if the player is hit
         if (isGrabbing)
@@ -309,12 +322,23 @@ public class Player : MonoBehaviour
     private void DealDamage(Transform pointOfAttack, float range, int damage)
     // Create array of all enemies within range of attack point and deal damage.
     {
-        Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(pointOfAttack.position, range, enemyLayers);
+        Collider2D[] hits = Physics2D.OverlapCircleAll(pointOfAttack.position, range, enemyLayers);
 
-        foreach (Collider2D enemy in hitEnemies)
+        foreach (Collider2D hit in hits)
         {
-            enemy.GetComponent<EnemyHealth>().TakeDamage(damage);
-            enemy.GetComponent<EnemyHealth>().SetPlayerMostRecentlyAttackedBy(this);
+            if (hit.CompareTag("Enemy"))
+            {
+                hit.GetComponent<EnemyHealth>().TakeDamage(damage);
+                hit.GetComponent<EnemyHealth>().SetPlayerMostRecentlyAttackedBy(this);
+            }
+            else if (hit.CompareTag("Breakable"))
+            {
+                hit.GetComponent<Breakable>().HandleHit();
+            }
+            else
+            {
+                Debug.LogWarning("Might be missing tag on " + hit.name);
+            }
         }
     }
 
@@ -450,9 +474,44 @@ public class Player : MonoBehaviour
 
 
 
-    public void SetIsInDialogue(bool isInDialogue)
+    public void SetIsDisabled(bool isDisabled)
+    // Used to force player into idle state where they can't move until enabled again
     {
-        this.isInDialogue = isInDialogue;
+        if (isDisabled)
+        {
+            this.isDisabled = true;
+            //animator.SetTrigger("idle");
+            animator.SetBool("isMoving", false);
+
+            myRigidBody.velocity = new Vector2(0, 0);
+        }
+        else
+        {
+            this.isDisabled = false;
+        }
+    }
+
+
+
+    public bool GetIsDisabled()
+    {
+        return isDisabled;
+    }
+
+
+
+
+    public void SetIsInCombat(bool isInCombat)
+    // Used to ensure that dialogue not triggered while in combat
+    {
+        this.isInCombat = isInCombat;
+    }
+
+
+
+    public bool GetIsInCombat()
+    {
+        return isInCombat;
     }
 
 

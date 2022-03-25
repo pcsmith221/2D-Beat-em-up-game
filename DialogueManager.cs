@@ -11,6 +11,7 @@ public class DialogueManager : MonoBehaviour
 
     Queue<string> sentences;
 
+
     // Start is called before the first frame update
     void Start()
     {
@@ -20,12 +21,14 @@ public class DialogueManager : MonoBehaviour
 
 
     public void StartDialogue(Dialogue dialogue)
+    // Brings down dialogue UI and disables player until dialogue is finished. 
     {
+        //Time.timeScale = 0f;
 
         var players = FindObjectsOfType<Player>();
         foreach (Player player in players)
         {
-            player.SetIsInDialogue(true);
+            player.SetIsDisabled(true);
         }
 
         animator.SetBool("isOpen", true);
@@ -63,7 +66,7 @@ public class DialogueManager : MonoBehaviour
 
 
     IEnumerator TypeSentence(string sentence)
-        // Type sentence out letter by letter with a frame duration between each letter
+     // Type sentence out letter by letter with a frame duration between each letter
     {
         dialogueText.text = "";
         foreach (char letter in sentence.ToCharArray())
@@ -76,13 +79,16 @@ public class DialogueManager : MonoBehaviour
 
 
     void EndDialogue()
+    // Remove dialogue box and enable player
     {
         animator.SetBool("isOpen", false);
 
         var players = FindObjectsOfType<Player>();
         foreach (Player player in players)
         {
-            player.SetIsInDialogue(false);
+            player.SetIsDisabled(false);
         }
+
+        //Time.timeScale = 1f;
     }
 }

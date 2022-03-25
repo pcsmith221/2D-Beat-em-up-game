@@ -290,6 +290,11 @@ public class EnemyHealth : MonoBehaviour
         return isGrabbable;
     }
 
+    public int GetMaxHealth()
+    {
+        return maxHealth;
+    }
+
     public int GetCurrentHealth()
     {
         return currentHealth;

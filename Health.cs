@@ -10,8 +10,8 @@ public class Health : MonoBehaviour
     [SerializeField] int maxHealth = 100;
     [SerializeField] HealthBar healthBar;
     [SerializeField] int lives = 3;
-    [SerializeField] GameManager gameManager;
     [SerializeField] float respawnTime = 3f;
+    [SerializeField] string playerDeathSound;
 
     int health;
     bool isAlive;
@@ -21,18 +21,24 @@ public class Health : MonoBehaviour
     Collider2D playerCollider;
     SpriteRenderer spriteRenderer;
     LivesText livesText;
+    GameManager gameManager;
 
     private void Start()
     {
         health = maxHealth;
         isAlive = true;
+
         healthBar.SetMaxHealth(maxHealth);
+
         animator = GetComponent<Animator>();
         player = GetComponent<Player>();
         playerCollider = GetComponent<Collider2D>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
         livesText = GetComponent<LivesText>();
         livesText.DisplayLives(lives);
+
+        gameManager = FindObjectOfType<GameManager>();
     }
 
 
@@ -58,16 +64,6 @@ public class Health : MonoBehaviour
 
         if (health <= Mathf.Epsilon) 
         {
-            Debug.Log("Player died!");
-            //die animation and respawn if lives > 0 (lives in game manager script?), or die and game over.
-            /*if (lives < 0)
-            {
-                Respawn();
-            }
-            else
-            {
-                GameOver(); 
-            }*/
             Die();
         }
     }
@@ -81,6 +77,7 @@ public class Health : MonoBehaviour
         gameManager.DecrementPlayerLives();
 
         animator.SetBool("isDead", true);
+        FindObjectOfType<AudioManager>().Play(playerDeathSound);
 
         //disable the player
         isAlive = false;

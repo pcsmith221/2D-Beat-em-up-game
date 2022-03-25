@@ -10,6 +10,7 @@ public class PlayerPrefsController : MonoBehaviour
 
     // PlayerPrefs keys
     const string MASTER_VOLUME_KEY = "master volume";
+    const string CURRENT_LEVEL_KEY = "current level";
 
 
 
@@ -30,5 +31,29 @@ public class PlayerPrefsController : MonoBehaviour
     public static float GetMasterVolume()
     {
         return PlayerPrefs.GetFloat(MASTER_VOLUME_KEY);
+    }
+
+
+
+    public static void NextLevel()
+    {
+        int currentLevel = GetCurrentLevel();
+        currentLevel++;
+
+        PlayerPrefs.SetInt(CURRENT_LEVEL_KEY, currentLevel);
+    }
+
+
+
+    public static void SetCurrentLevel(int level)
+    // Used for debug purposes.
+    {
+        PlayerPrefs.SetInt(CURRENT_LEVEL_KEY, level);
+    }
+
+
+    public static int GetCurrentLevel()
+    {
+        return PlayerPrefs.GetInt(CURRENT_LEVEL_KEY);
     }
 }
