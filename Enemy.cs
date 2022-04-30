@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Linq;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
@@ -39,15 +40,21 @@ public class Enemy : MonoBehaviour
     [SerializeField] float attackRate = 1f;
 
     //state variables
-    Player currentTarget;
+    Player currentTarget = null;
     Health currentTargetHealth;
     float nextAttackTime = 0f;
+
+    //List<float> playerDistances;
+    Dictionary<Player, float> playerDistances;
 
     float decisionDuration;
     Vector3 roamDestination;
 
     int isHit = 0;
     int isGroundAttacking = 0;
+
+    bool inMultiplayer = false;
+    PlayerManager playerManager;
 
     bool isChasingPlayer = false;
     bool isRoaming = false;
@@ -82,33 +89,88 @@ public class Enemy : MonoBehaviour
 
     List<DecisionWeight> weights;
 
+
+
     // Start is called before the first frame update
     void Start()
     {
+        // Create data structures
         weights = new List<DecisionWeight>();
+        playerDistances = new Dictionary<Player, float>();
+
+        // Get component references
         animator = GetComponent<Animator>();
         enemyHealth = GetComponent<EnemyHealth>();
         rb = GetComponent<Rigidbody2D>();
 
-        //currentTarget = FindObjectOfType<Player>().transform;
-        currentTarget = FindObjectOfType<Player>();
-        currentTargetHealth = currentTarget.GetComponent<Health>();
-        //For multiplayer try: find ObjectsOfType<Player>().transform and assign to transform array, make current target a random player
-        //change target if enemy hit by different player within the take damage method
+        playerManager = FindObjectOfType<PlayerManager>();
+        inMultiplayer = playerManager.InMultiplayer();
+
+        if (inMultiplayer)
+        {
+            // Get initial target 
+            UpdateTarget();
+        }
+        else
+        {
+            currentTarget = FindObjectOfType<Player>();
+            currentTargetHealth = currentTarget.GetComponent<Health>();
+        }
     }
 
 
 
     private void Update()
     {
-        UpdateState();
-        FlipSprite();
-        //Debug.Log("decision duration = " + decisionDuration);
-        HandleDecisions();
-        ChasePlayer();
-        Roaming();
+        if (!enemyHealth.IsDisabled())
+        {
+            UpdateState();
+            FlipSprite();
+            //Debug.Log("decision duration = " + decisionDuration);
+            HandleDecisions();
+            ChasePlayer();
+            Roaming();
+            if (inMultiplayer)
+            {
+                UpdateTarget();
+            }
 
-        //StopSliding();
+            //StopSliding();
+        }
+    }
+
+
+
+    private void UpdateTarget()
+    // Rebuild targeting dictionary to target the closest player
+    {
+        playerDistances.Clear();
+
+        // Create array of all players and build distance dictionary of alive players
+        var players = FindObjectsOfType<Player>();
+        foreach (var player in players)
+        {
+            if (player.GetComponent<Health>().GetIsAlive())
+            {
+                playerDistances.Add(player, Vector3.Distance(transform.position, player.transform.position));
+            }
+        }
+
+        if (playerDistances.Count > 0)
+        {
+            // Make current target the closest player
+            var minDistance = playerDistances.Values.Min();
+
+            // Lambda expression that gets player key that has the min distance
+            currentTarget = playerDistances.FirstOrDefault(p => p.Value == minDistance).Key;
+            currentTargetHealth = currentTarget.GetComponent<Health>();
+        }
+        else
+        {
+            currentState = EnemyState.waiting;
+            DoStateAction();
+        }
+        
     }
 
 
@@ -160,14 +222,6 @@ public class Enemy : MonoBehaviour
             DoStateAction();
         }*/
 
-        if (currentTarget.enabled == false)
-        {
-            currentState = EnemyState.waiting;
-            DoStateAction();
-            // Find new target? Call update target method?
-
-            return;
-        }
 
         else if (canMakeDecision)
         {
@@ -175,7 +229,7 @@ public class Enemy : MonoBehaviour
 
             if (!currentTargetHealth.GetIsAlive())
             // Current Target died
-            // TODO change to retargeting when working on multiplayer
+            // Redundant in multiplayer since targeting script finds alive players
             {
                 currentState = EnemyState.waiting;
                 DoStateAction();
@@ -400,9 +454,13 @@ public class Enemy : MonoBehaviour
 
 
 
-    private void FlipSprite()
+    public virtual void FlipSprite()
     // Changes the x value based on the direction the player is moving ('+' = right, '-' = left)
     {
+        if (!currentTarget)
+        {
+            return;
+        }
         if ((transform.position.x - currentTarget.transform.position.x) >= Mathf.Epsilon)
         {
             transform.localScale = new Vector3(-1, 1, 1);
@@ -411,6 +469,58 @@ public class Enemy : MonoBehaviour
         {
             transform.localScale = new Vector3(1, 1, 1);
         }
+    }
+
+
+
+
+    public virtual void ReverseFlipSprite()
+    // Flip sprite reversed for sprite sheets that start with character looking left
+    {
+        if (!currentTarget)
+        {
+            return;
+        }
+        if ((transform.position.x - currentTarget.transform.position.x) >= Mathf.Epsilon)
+        {
+            transform.localScale = new Vector3(1, 1, 1);
+        }
+        else
+        {
+            transform.localScale = new Vector3(-1, 1, 1);
+        }
+    }
+
+
+
+    private void OnEnable()
+    // Subscribes to multiplayer events in PlayerManager script
+    {
+        PlayerManager.startedMultiplayer += StartMultiTargeting;
+        PlayerManager.endedMultiplayer += StopMultiTargeting;
+    }
+
+
+
+    private void StartMultiTargeting()
+    {
+        inMultiplayer = true;
+    }
+
+
+
+    private void StopMultiTargeting()
+    {
+        inMultiplayer = false;
+    }
+
+
+
+    private void OnDisable()
+    // Unsubscribes from multiplayer events in PlayerManager script
+    {
+        PlayerManager.startedMultiplayer -= StartMultiTargeting;
+        PlayerManager.endedMultiplayer -= StopMultiTargeting;
     }
 
 

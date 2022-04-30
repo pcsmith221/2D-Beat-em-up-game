@@ -8,8 +8,8 @@ public class GoonSpawner : MonoBehaviour
     [SerializeField] float minSpawnDelay = 1f;
     [SerializeField] float maxSpawnDelay = 5f;
 
-    [Header("Choose spawner type (conditional not done yet)")]
-    [Tooltip("Enable if you would like the spawner to spawn until a condition is met")]
+    [Header("Choose spawner type (conditional must be stopped elsewhere")]
+    [Tooltip("Enable if you would like the spawner to keep spawning until a condition is met")]
     [SerializeField] bool conditionalSpawner = false;
 
     [Tooltip("Enable if you would like the spawner to spawn a specific amount of randomly chosen enemy types")]
@@ -19,7 +19,7 @@ public class GoonSpawner : MonoBehaviour
     [SerializeField] bool exactCountSpawner = false;
 
     [Header("Number/type of enemies")]
-    [Tooltip("Not needed if conditional spawner; same as array size if exact spawner")]
+    [Tooltip("Not needed if conditional spawner; must be same as array size if exact spawner")]
     [SerializeField] int numberOfEnemiesToSpawn;
 
     [Tooltip("Enemy types spawner chooses from")]
@@ -27,7 +27,7 @@ public class GoonSpawner : MonoBehaviour
 
     bool spawn = true;
 
-    public IEnumerator ActivateSpawner()
+    public IEnumerator StartSpawning()
         // Begins spawning enemies from the array based on the type of spawner that it is
     {
         // NOTE: currently no scripts/battle events that stop conditional spawners from spawning. 

@@ -5,6 +5,7 @@ using UnityEngine;
 public class BigShark : Enemy
     // inherits from Enemy class to override deal damage method
 {
+
     public override void EnemyDealDamage(int damageToDeal)
     {
         Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(attackPoint.position, damageRange, playerLayers);

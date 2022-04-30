@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -20,13 +21,24 @@ public class Pickup : MonoBehaviour
     }
 
 
-    void Update()
+
+    private void PickupItem()
     {
-        if (pickupAllowed && Input.GetButtonDown("Pickup"))
+        if (pickupAllowed)
         {
             ItemPickedUp();
         }
     }
+
+
+
+    //void Update()
+    //{
+    //    if (pickupAllowed && Input.GetButtonDown("Pickup"))
+    //    {
+    //        ItemPickedUp();
+    //    }
+    //}
 
 
 
@@ -61,5 +73,21 @@ public class Pickup : MonoBehaviour
         {
             pickupAllowed = false;
         }
+    }
+
+
+
+    private void OnEnable()
+    // Subscribes to pauseGame event in Player script
+    {
+        Player.interact += PickupItem;
+    }
+
+
+
+    private void OnDisable()
+    // Unsubscribes from pauseGame event should the script become disabled
+    {
+        Player.interact -= PickupItem;
     }
 }

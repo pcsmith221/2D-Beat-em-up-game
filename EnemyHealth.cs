@@ -18,6 +18,7 @@ public class EnemyHealth : MonoBehaviour
     [SerializeField] float recoveryTime = 2f;
     [SerializeField] bool isGrabbable = true;
     [SerializeField] bool staggerOnHit = true;
+    [SerializeField] bool isKnockbackable = true;
     [SerializeField] int hitGroundDamage = 10;
 
     [Header("Knockback/grab Parameters")]
@@ -69,6 +70,14 @@ public class EnemyHealth : MonoBehaviour
 
 
 
+    public bool IsDisabled()
+    // If any state variables are true, enemy script should not update. 
+    {
+        return (isGrabbed || isBeingThrown || isBeingKnockedback || isKnockedback);
+    }
+
+
+
     private void FixedUpdate()
     {
         if (isBeingThrown)
@@ -90,10 +99,10 @@ public class EnemyHealth : MonoBehaviour
     {
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(knockbackOtherEnemiesPoint.position, knockbackOtherEnemiesRange, enemyLayers);
 
-        //TODO only call knockback method on enemies that are knockbackable 
+        // Only call knockback method on enemies that are knockbackable 
         foreach (Collider2D knockedEnemyCollider in hitEnemies)
         {
-            if (!knockedEnemyCollider.Equals(this.myCollider2D))
+            if (!knockedEnemyCollider.Equals(this.myCollider2D) && knockedEnemyCollider.GetComponent<EnemyHealth>().GetKnockbackable())
             {
                 knockedEnemyCollider.GetComponent<EnemyHealth>().Knockback();
             }
@@ -102,7 +111,14 @@ public class EnemyHealth : MonoBehaviour
 
 
 
-    private void Knockback()
+    public bool GetKnockbackable()
+    {
+        return isKnockbackable;
+    }
+
+
+
+    public virtual void Knockback()
     // Knockback enemy. Currently called when hit by a thrown enemy, but could be called by Anahey's attacks. Maybe all get knocked down on respawn? 
     {
         isBeingKnockedback = true;
@@ -130,6 +146,7 @@ public class EnemyHealth : MonoBehaviour
         rb.velocity = new Vector2(distanceThrownByPlayer.x * signOfX, distanceThrownByPlayer.y);
 
         isBeingThrown = true;
+        isGrabbable = false;
     }
 
 
@@ -169,6 +186,7 @@ public class EnemyHealth : MonoBehaviour
         yield return new WaitForSeconds(knockdownRecoveryTime);
         animator.SetBool("isKnockedDown", false);
         isKnockedback = false;
+        isGrabbable = true;
     }
 
 
@@ -236,23 +254,25 @@ public class EnemyHealth : MonoBehaviour
 
 
 
-    private void Die()
+    public virtual void Die()
     // Triggers death animation and disables the enemy. 
     {
         if(transform.parent)
         {
-            battleEvent.DecrementEnemy();
+            if (transform.parent.CompareTag("BattleEvent"))
+            {
+                battleEvent.DecrementEnemy();
+            }
         }
-        
-        animator.SetBool("isDead", true);
+
+        //animator.SetBool("isDead", true);
+        animator.SetTrigger("die");
         audioManager.Play(deathSound);
 
         if (isGrabbed)
         {
             animator.SetBool("isGrabbed", false);
         }
-
-        playerMostRecentlyAttackedBy.GetComponent<Score>().AddToScore(scoreForDefeating);
 
         //disable the enemy
         GetComponentInChildren<SpriteRenderer>().color = Color.grey;
@@ -264,13 +284,14 @@ public class EnemyHealth : MonoBehaviour
             GetComponent<Enemy>().enabled = false;
         }
 
+        playerMostRecentlyAttackedBy.GetComponent<Score>().AddToScore(scoreForDefeating);
         this.enabled = false;
     }
 
 
 
     public void SetPlayerMostRecentlyAttackedBy(Player player)
-        // Used to give the correct player the score when the enemy is defeated.
+    // Used to give the correct player the score when the enemy is defeated.
     {
         playerMostRecentlyAttackedBy = player;
     }

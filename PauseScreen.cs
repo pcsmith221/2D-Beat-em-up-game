@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,21 +8,18 @@ public class PauseScreen : MonoBehaviour
 
     [SerializeField] GameObject pauseMenuUI;
     static bool isGamePaused = false;
+    bool gameEnded = false;
 
-    
-    // Update is called once per frame
-    void Update()
+
+    private void PausePressed()
     {
-        if (Input.GetButtonDown("Pause"))
+        if (isGamePaused)
         {
-            if (isGamePaused)
-            {
-                Resume();
-            }
-            else
-            {
-                Pause();
-            }
+            Resume();
+        }
+        else if (!gameEnded)
+        {
+            Pause();
         }
     }
 
@@ -57,5 +55,30 @@ public class PauseScreen : MonoBehaviour
     public bool GetIsGamePaused()
     {
         return isGamePaused;
+    }
+
+
+
+    public void GameEnded()
+    {
+        gameEnded = true;
+    }
+
+
+
+    private void OnEnable()
+    // Subscribes to pauseGame event in Player script
+    {
+        Player.pauseGame += PausePressed;
+        GameManager.gameEnded += GameEnded;
+    }
+
+
+
+    private void OnDisable()
+    // Unsubscribes from pauseGame event should the script become disabled
+    {
+        Player.pauseGame -= PausePressed;
+        GameManager.gameEnded -= GameEnded;
     }
 }

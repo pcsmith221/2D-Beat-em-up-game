@@ -8,15 +8,17 @@ using Unity.Mathematics;
 // The camera unlocks and the colliders are removed once all enemies are defeated. 
 public class BattleEvent : MonoBehaviour
 {
-    [SerializeField] CinemachineVirtualCamera virtualCamera;
-
     [Tooltip("Place spawners in scene first then drag to this field")]
     [SerializeField] GoonSpawner[] goonSpawners;
 
     [Tooltip("Boundaries the player cannot cross during battles")]
-    [SerializeField] Collider2D[] playerColliders;
+    //[SerializeField] Collider2D[] playerColliders;
+    [SerializeField] GameObject playerColliders;
 
-    // state variables
+    // Cached reference
+    CinemachineStateDrivenCamera virtualCamera;
+
+    // State variables
     int totalNumberOfEnemiesToDefeat = 0;
     bool battleStarted = false;
 
@@ -24,8 +26,11 @@ public class BattleEvent : MonoBehaviour
 
     private void Awake()
     {
-        // ensures battle colliders disabled by default
+        // Ensures battle colliders disabled by default
         SetBattleColliders(false);
+
+        // Get reference to cinemachine camera controller to disable when battle event starts
+        virtualCamera = FindObjectOfType<CinemachineStateDrivenCamera>();
     }
 
 
@@ -43,7 +48,7 @@ public class BattleEvent : MonoBehaviour
     private void SetBattleColliders(bool isEnabled)
         // enable or disable battle colliders
     {
-        foreach (Collider2D playerCollider in playerColliders)
+        foreach (var playerCollider in playerColliders.GetComponentsInChildren<Collider2D>())
         {
             playerCollider.enabled = isEnabled;
         }
@@ -56,6 +61,7 @@ public class BattleEvent : MonoBehaviour
     {
         if (battleStarted == false)
         {
+            Debug.Log("Battle event statrted");
             SetBattleColliders(true);
 
             var players = FindObjectsOfType<Player>();
@@ -64,7 +70,7 @@ public class BattleEvent : MonoBehaviour
                 player.SetIsInCombat(true);
             }
 
-            // prevent camera from moving by disabling it 
+            // prevent camera from moving by disabling it
             virtualCamera.enabled = false;
 
             battleStarted = true;
@@ -81,7 +87,7 @@ public class BattleEvent : MonoBehaviour
         {
             spawner.enabled = true;
             totalNumberOfEnemiesToDefeat += spawner.GetNumberOfEnemiesToSpawn();
-            StartCoroutine(spawner.ActivateSpawner());
+            StartCoroutine(spawner.StartSpawning());
         }
     }
 
@@ -92,7 +98,7 @@ public class BattleEvent : MonoBehaviour
     {
         if (totalNumberOfEnemiesToDefeat <= 0)
         {
-
+            Debug.Log("Battle Event Ended");
             virtualCamera.enabled = true;
             SetBattleColliders(false);
 
@@ -103,6 +109,7 @@ public class BattleEvent : MonoBehaviour
             }
 
             // TODO display go graphic
+            this.enabled = false;
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -10,17 +11,20 @@ public class GameManager : MonoBehaviour
 
     int playerLives = 0;
 
+    public static event Action gameEnded;
+    public static event Action bossDied;
+
+
     private void Start()
     {
-        var playerHealthArray = FindObjectsOfType<Health>();
-        foreach (Health playerHealth in playerHealthArray)
-        {
-            playerLives += playerHealth.GetLives();
-        }
-
-
-
         loseScreen.SetActive(false);    
+    }
+
+
+
+    public void AddPlayerLives(int lives)
+    {
+        playerLives += lives;
     }
 
 
@@ -36,7 +40,7 @@ public class GameManager : MonoBehaviour
     {
         playerLives--;
 
-        if (playerLives < 0)
+        if (playerLives <= 0)
         {
             GameOver();
         }
@@ -44,8 +48,19 @@ public class GameManager : MonoBehaviour
 
 
 
+    public void BossDefeated()
+    {
+        bossDied?.Invoke();
+    }
+
+
+
     public void GameOver()
     {
+        gameEnded?.Invoke();
         loseScreen.SetActive(true);
+        FindObjectOfType<MusicPlayer>().GetComponent<AudioSource>().clip = null;
+        FindObjectOfType<AudioManager>().Play("Game Over");
     }
+
 }

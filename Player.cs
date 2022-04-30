@@ -1,15 +1,18 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Dynamic;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using TMPro;
 
 // This class contains all attributes and methods associated with the player character's movement, attacks, and health. 
 public class Player : MonoBehaviour
 {
-    //config variables
-    // Any enemy class not included in the layer mask array will not attackable by the player 
-    [Header("IMPORTANT: ALL ENEMY TYPES")]
+    // Config variables
+    [Header("IMPORTANT: ALL DAMAGABLE LAYERS")]
+    [Tooltip("Any enemy class or object not included in this layer mask array will not be attackable by the player ")]
     [SerializeField] LayerMask enemyLayers;
 
     [Header("Attack Points")]
@@ -34,7 +37,10 @@ public class Player : MonoBehaviour
     [Header("Sound clip names")]
     [SerializeField] string playerHitSound;
 
-    //cached component references
+    // Keep track of which player this is in multiplayer
+    int playerNumber = 1; 
+
+    // Cached references
     Rigidbody2D myRigidBody;
     Animator animator;
     CapsuleCollider2D myCapsuleCollider2D;
@@ -43,9 +49,20 @@ public class Player : MonoBehaviour
     PauseScreen pauseScreen;
     DialogueManager dialogueManager;
     AudioManager audioManager;
+    TextMeshPro playerNumberText;
 
-    //state variables
-    Vector2 movement; 
+    EnemyHealth enemyGrabbed;
+
+    // Input actions
+    public static PlayerInputAction playerInputActions;
+    InputActionAsset inputAsset;
+    InputActionMap player;
+    InputAction movementAction;
+    PlayerInput playerInput;
+    PlayerInputManager playerInputManager;
+
+    // State variables
+    Vector2 movement;
     float yOnGroundPosition;
     float nextAttackTime = 0f;
 
@@ -55,20 +72,122 @@ public class Player : MonoBehaviour
     bool isKnockedback = false;
     bool isDisabled = false;
     bool isInCombat = false;
-    EnemyHealth enemyGrabbed;
+    bool inMultiplayer = false;
 
-    //"bool" variables because animation events cant pass bool parameters
+    // "bool" variables because animation events cant pass bool parameters
     int isGroundAttacking = 0;
     int isHit = 0;
 
-    // Start is called before the first frame update
-    void Start()
+    // C# Events to reduce coupling
+    public static event Action pauseGame;
+    public static event Action interact;
+    public static event Action addKeyboardPlayer;
+    public static event Action spawned;
+
+
+
+    private void Awake()
+    // Create instance of input action asset 
     {
-        // cache the player component references into variables to be used throughout the script 
+        playerInputManager = FindObjectOfType<PlayerInputManager>();
+        playerInput = GetComponent<PlayerInput>();
+        inputAsset = playerInput.actions;
+        //playerInputActions = new PlayerInputAction();
+        //inputAsset = GetComponent<PlayerInput>().actions;
+        player = inputAsset.FindActionMap("Player");
+
+    //    var p2 = PlayerInput.Instantiate(this.gameObject,
+    //controlScheme: ", device: Keyboard.current);
+    }
+
+
+
+    private void OnEnable()
+    // Cache input action references and enable Player action map
+    {
+        //movementAction = playerInputActions.Player.Movement;
+
+        //playerInputActions.Player.Pause.performed += Pause_performed;
+        //playerInputActions.Player.Interact.performed += Interact_performed;
+        //playerInputActions.Player.Enable();
+
+        //playerInputManager.onPlayerJoined += AddKeyboardPlayer;
+
+        movementAction = player.FindAction("Movement");
+        player.FindAction("Pause").performed += Pause_performed;
+        player.FindAction("Interact").performed += Interact_performed;
+        //player.FindAction("AddPlayer").performed += AddPlayer_performed;
+        PlayerManager.startedMultiplayer += StartedMultiplayer;
+        PlayerManager.endedMultiplayer += EndedMultiplayer;
+        player.Enable();
+        
+
+    }
+
+    //private void AddPlayer_performed(InputAction.CallbackContext obj)
+    //{
+    //    if (!addedSecondKeyboardPlayer)
+    //    {
+    //        PlayerInput.Instantiate(gameObject,
+    //controlScheme: "KeyboardAlt", pairWithDevice: Keyboard.current);
+    //    }
+    //}
+
+    //private void AddKeyboardPlayer(PlayerInput obj)
+    //{
+    //    if (obj.playerIndex == 1)
+    //    {
+    //        obj.SwitchCurrentControlScheme("KeyboardAlt");
+    //    }
+    //}
+
+    private void Interact_performed(InputAction.CallbackContext obj)
+    // Broadcasts to interact subscribers the interact button has been pressed
+    {
+        interact?.Invoke();
+    }
+
+    private void OnDisable()
+    // Ensure input events are not called if player object is disabled
+    {
+        player.FindAction("Pause").performed -= Pause_performed;
+        player.FindAction("Interact").performed -= Interact_performed;
+        PlayerManager.startedMultiplayer -= StartedMultiplayer;
+        PlayerManager.endedMultiplayer -= EndedMultiplayer;
+        //playerInputManager.onPlayerJoined -= AddKeyboardPlayer;
+        player.Disable();
+    }
+
+
+
+    private void StartedMultiplayer()
+    {
+        inMultiplayer = true;
+    }
+
+
+    private void EndedMultiplayer()
+    {
+        inMultiplayer = false;
+    }
+
+
+    private void Pause_performed(InputAction.CallbackContext obj)
+    // Broadcasts to pauseGame subscribers that the pause button has been pressed 
+    {
+        pauseGame?.Invoke();
+    }
+
+
+
+    void Start()
+    // Cache the player component references into variables to be used throughout the script 
+    {
         myRigidBody = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         myCapsuleCollider2D = GetComponent<CapsuleCollider2D>();
         health = GetComponent<Health>();
+        playerNumberText = GetComponentInChildren<TextMeshPro>();
 
         audioManager = FindObjectOfType<AudioManager>();
         pauseScreen = FindObjectOfType<PauseScreen>();
@@ -80,11 +199,11 @@ public class Player : MonoBehaviour
     void Update()
     {
         // Ground attacks don't deal with physics so they can go into Update()
-        if (!isKnockedback && !isDisabled && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        if (PlayerHasControl())
         {
             GroundAttack();
-            Grab();
             GrabAttack();
+            Grab();
             BackAttack();
         }
         else if (isDisabled)
@@ -98,7 +217,7 @@ public class Player : MonoBehaviour
     private void FixedUpdate()
     // The methods that deal with physics should go into FixedUpdate(). 
     {
-        if (!isKnockedback && !isDisabled && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        if (PlayerHasControl())
         {
             Move();
             FlipSprite();
@@ -114,6 +233,20 @@ public class Player : MonoBehaviour
 
 
 
+    private bool PlayerHasControl()
+    {
+        if (!isKnockedback && !isDisabled && !pauseScreen.GetIsGamePaused() && health.GetIsAlive())
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+
+
     private void Dialogue()
     {
         //if (!isJumping)
@@ -121,7 +254,7 @@ public class Player : MonoBehaviour
         //    myRigidBody.velocity = new Vector2(0, 0);
         //}
 
-        if (Input.GetButtonDown("Fire1"))
+        if (player.FindAction("Attack").triggered || player.FindAction("Jump").triggered)
         {
             dialogueManager.DisplayNextSentence();
         }
@@ -156,7 +289,7 @@ public class Player : MonoBehaviour
     {
         if ((Time.time >= nextAttackTime) && (isHit == 0) && !isJumping && !isGrabbing)
         {
-            if (Input.GetButtonDown("Fire1"))
+            if (player.FindAction("Attack").triggered)
             {
                 // Ensure player can only attack the specified number of times per second.
                 nextAttackTime = Time.time + (1f / attackRate);
@@ -174,7 +307,7 @@ public class Player : MonoBehaviour
     // Animation events cannot call methods with bool parameters.
     // This method is called from the Attacking animation to make isGroundAttacking true, and from the idle animation to make it false.
     {
-        if ( (isGroundAttacking == 1) || (isGroundAttacking == 0) )
+        if ((isGroundAttacking == 1) || (isGroundAttacking == 0))
         {
             this.isGroundAttacking = isGroundAttacking;
         }
@@ -208,22 +341,22 @@ public class Player : MonoBehaviour
         // maybe can reduce back attack damage so while it's quicker it's better to do normal combos
         // could probably also rework this method to be less redundant
 
-        // check if player is attacking and pushing left while the character is already attacking to the right
-        if (isGroundAttacking == 1 && Input.GetAxisRaw("Horizontal") == -1 && Input.GetButtonDown("Fire1") && transform.localScale.x == 1)
+        // Check if player is attacking and pushing left while the character is already attacking to the right
+        if (isGroundAttacking == 1 && movementAction.ReadValue<Vector2>().x == -1 && player.FindAction("Attack").triggered && transform.localScale.x == 1)
         {
             // Flip the player sprite and trigger back attack
-            transform.localScale = new Vector3(-1,1,1);
+            transform.localScale = new Vector3(-1, 1, 1);
             animator.SetTrigger("backAttack");
 
             DealDamage(attackPoint, attackRange, attackDamage);
         }
-        // same as above code except the player is starting out facing left
-        else if (isGroundAttacking == 1 && Input.GetAxisRaw("Horizontal") == 1 && Input.GetButtonDown("Fire1") && transform.localScale.x == -1)
+        // Same as above code except the player is starting out facing left
+        else if (isGroundAttacking == 1 && movementAction.ReadValue<Vector2>().x == 1 && player.FindAction("Attack").triggered && transform.localScale.x == -1)
         {
             transform.localScale = new Vector3(1, 1, 1);
             animator.SetTrigger("backAttack");
 
-            DealDamage(attackPoint, attackRange, attackDamage); 
+            DealDamage(attackPoint, attackRange, attackDamage);
         }
     }
 
@@ -232,7 +365,7 @@ public class Player : MonoBehaviour
     private void AirAttack()
     // Trigger air attack if player presses attack while jumping and has not already air attacked
     {
-        if (Input.GetButtonDown("Fire1") && isJumping && !isAirAttacking)
+        if (player.FindAction("Attack").triggered && isJumping && !isAirAttacking)
         {
             isAirAttacking = true;
             animator.SetBool("isAirAttacking", true);
@@ -248,19 +381,19 @@ public class Player : MonoBehaviour
     // Currently no functionality for an enemy breaking free on their own. Enemies are only released when the player is hit, when they are thrown, or when they lose all health. 
     {
         //only grab if not being hit or already performing another action
-        if (Input.GetButtonDown("Fire2") && !isJumping && isHit == 0 && isGroundAttacking == 0 && !isGrabbing)
+        if (player.FindAction("Grab").triggered && !isJumping && isHit == 0 && isGroundAttacking == 0 && !isGrabbing)
         {
             Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, enemyLayers);
 
             // Only attempt to grab one enemy
-            if (hitEnemies.Length > 0) 
+            if (hitEnemies.Length > 0)
             {
                 enemyGrabbed = hitEnemies[0].GetComponent<EnemyHealth>();
 
                 if (enemyGrabbed.IsGrabbable())
                 {
                     // Position the grabbed enemy in the right place depending on the direction the player facing
-                    if(transform.localScale.x == 1)
+                    if (transform.localScale.x == 1)
                     {
                         enemyGrabbed.transform.position = new Vector3(gameObject.transform.position.x + enemyGrabbed.grabPositionXOffset,
                                                                   gameObject.transform.position.y, 0);
@@ -289,11 +422,13 @@ public class Player : MonoBehaviour
         if (isGrabbing)
         {
             // Attack enemy while still adhering to the attack rate. 
-            if (Input.GetButtonDown("Fire1") && Time.time >= nextAttackTime)
+            if (player.FindAction("Attack").triggered && Time.time >= nextAttackTime)
             {
                 animator.SetTrigger("attack");
                 nextAttackTime = Time.time + (1f / attackRate);
+                enemyGrabbed.SetPlayerMostRecentlyAttackedBy(this);
                 enemyGrabbed.TakeDamage(attackDamage);
+
 
                 if (enemyGrabbed.GetCurrentHealth() <= 0)
                 {
@@ -303,7 +438,7 @@ public class Player : MonoBehaviour
                 }
             }
             // Grab throw
-            else if(Input.GetButtonDown("Fire3"))
+            else if (player.FindAction("Grab").triggered)
             {
                 animator.SetTrigger("throw");
                 isGrabbing = false;
@@ -313,6 +448,8 @@ public class Player : MonoBehaviour
 
                 // Throw enemy in the direction that the player is facing
                 enemyGrabbed.ThrowEnemy(Mathf.Sign(transform.localScale.x));
+
+                enemyGrabbed = null;
             }
         }
     }
@@ -328,8 +465,8 @@ public class Player : MonoBehaviour
         {
             if (hit.CompareTag("Enemy"))
             {
-                hit.GetComponent<EnemyHealth>().TakeDamage(damage);
                 hit.GetComponent<EnemyHealth>().SetPlayerMostRecentlyAttackedBy(this);
+                hit.GetComponent<EnemyHealth>().TakeDamage(damage);
             }
             else if (hit.CompareTag("Breakable"))
             {
@@ -337,7 +474,7 @@ public class Player : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("Might be missing tag on " + hit.name);
+                Debug.LogWarning("Might be missing enemy or breakable tag on " + hit.name);
             }
         }
     }
@@ -353,12 +490,12 @@ public class Player : MonoBehaviour
             return;
         }
 
-        movement.x = Input.GetAxisRaw("Horizontal");
+        movement.x = movementAction.ReadValue<Vector2>().x;
 
         // Only allow player to move horizontally while jumping. Vertical movement would let the player fly or allow them to cut the jump short. 
-        if (!isJumping) 
+        if (!isJumping)
         {
-            movement.y = Input.GetAxisRaw("Vertical");
+            movement.y = movementAction.ReadValue<Vector2>().y;
         }
 
         // Normalize movement vector to prevent faster diagonal movement.
@@ -374,7 +511,7 @@ public class Player : MonoBehaviour
     // Gives the player upwards velocity and turns on gravity until the character returns to the y value they jumped from. `
     // Gravity generally remains off, otherwise the player would be constantly falling. 
     {
-        if (Input.GetButtonDown("Jump") && !isJumping && (movement.y == 0) && (isGroundAttacking == 0) && !isGrabbing) 
+        if (player.FindAction("Jump").triggered && !isJumping && (movement.y == 0) && (isGroundAttacking == 0) && !isGrabbing)
         {
             yOnGroundPosition = transform.position.y;
             isJumping = true;
@@ -395,7 +532,7 @@ public class Player : MonoBehaviour
     public void Knockback(float signOfX)
     // Knocks player down, transitions animation, and changes isKnockedback state to true
     {
-        yOnGroundPosition = transform.position.y; 
+        yOnGroundPosition = transform.position.y;
         isKnockedback = true;
         myCapsuleCollider2D.isTrigger = true;
 
@@ -468,7 +605,13 @@ public class Player : MonoBehaviour
         bool playerHasHorizontalSpeed = (Mathf.Abs(myRigidBody.velocity.x) > Mathf.Epsilon);
         if (playerHasHorizontalSpeed)
         {
-            transform.localScale = new Vector2(Mathf.Sign(myRigidBody.velocity.x), 1f); 
+            var localScale = new Vector2(Mathf.Sign(myRigidBody.velocity.x), 1f);
+            transform.localScale = localScale;
+
+            if (inMultiplayer)
+            {
+                playerNumberText.transform.localScale = localScale;
+            }
         }
     }
 
@@ -512,6 +655,27 @@ public class Player : MonoBehaviour
     public bool GetIsInCombat()
     {
         return isInCombat;
+    }
+
+
+
+    public int GetPlayerNumber()
+    {
+        return playerNumber;
+    }
+
+
+
+    public void SetPlayerNumber(int playerNumber)
+    {
+        if (playerNumber < 1 || playerNumber > 4)
+        {
+            Debug.LogError("Tried to assign player number outside range 1-4");
+        }
+        else
+        {
+            this.playerNumber = playerNumber;
+        }
     }
 
 

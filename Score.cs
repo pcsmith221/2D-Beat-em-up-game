@@ -7,8 +7,15 @@ using TMPro;
 
 public class Score : MonoBehaviour
 {
-    [SerializeField] TextMeshProUGUI scoreText;
+    public TextMeshProUGUI scoreText;
     [SerializeField] int score = 0; //serialized atm for debug purposes
+
+    private void Start()
+    {
+        scoreText.text = "Score: " + score.ToString();
+    }
+
+
 
     public void AddToScore(int scoreToAdd)
     {
@@ -16,8 +23,17 @@ public class Score : MonoBehaviour
         DisplayScore();
     }
 
+
+
     private void DisplayScore()
     {
-        scoreText.text = score.ToString();
+        scoreText.text = "Score: " + score.ToString();
+    }
+
+
+
+    public int GetScore()
+    {
+        return score;
     }
 }

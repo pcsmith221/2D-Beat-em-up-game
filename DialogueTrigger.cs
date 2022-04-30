@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,15 +13,22 @@ public class DialogueTrigger : MonoBehaviour
     bool triggeredAlready = false;
 
 
-
-    void Update()
+    private void ReplayDialogue()
     // Allow player to trigger dialogue again manually. 
     {
-        if (inDialogueRange && Input.GetButtonDown("Pickup"))
+        if (inDialogueRange)
         {
             TriggerDialogue();
         }
     }
+
+    //void Update()
+    //{
+    //    if (inDialogueRange && Input.GetButtonDown("Pickup"))
+    //    {
+    //        TriggerDialogue();
+    //    }
+    //}
 
 
 
@@ -62,4 +70,21 @@ public class DialogueTrigger : MonoBehaviour
 
         FindObjectOfType<DialogueManager>().StartDialogue(dialogue);
     }
+
+
+
+    private void OnEnable()
+    // Subscribes to pauseGame event in Player script
+    {
+        Player.interact += ReplayDialogue;
+    }
+
+
+
+    private void OnDisable()
+    // Unsubscribes from pauseGame event should the script become disabled
+    {
+        Player.interact -= ReplayDialogue;
+    }
+
 }

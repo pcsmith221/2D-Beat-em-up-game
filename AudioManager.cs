@@ -48,6 +48,7 @@ public class AudioManager : MonoBehaviour
         }
         else
         {
+            sound.source.volume = PlayerPrefsController.GetMasterVolume();
             sound.source.Play();
         }
     }

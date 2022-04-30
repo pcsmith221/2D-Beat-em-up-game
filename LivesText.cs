@@ -5,7 +5,7 @@ using TMPro;
 
 public class LivesText : MonoBehaviour
 {
-    [SerializeField] TextMeshProUGUI livesText;
+    public TextMeshProUGUI livesText;
 
     public void DisplayLives(int lives)
     {
